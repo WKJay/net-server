@@ -33,6 +33,6 @@ int ns_if_listen(socket_t socket, int backlog) {
     return listen(socket, backlog);
 }
 
-int ns_if_close(socket_t socket) {
+int ns_if_socket_close(socket_t socket) {
     return closesocket(socket);
 }

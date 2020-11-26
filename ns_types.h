@@ -10,7 +10,7 @@
 
 #include <stdlib.h>
 #define NS_MALLOC(s) malloc((size_t)(s))
-#define NS_FREE(p, h, t)      \
+#define NS_FREE(p)            \
     {                         \
         void* xp = (p);       \
         if ((xp)) free((xp)); \
@@ -18,7 +18,7 @@
 #define NS_REALLOC(p, n, h, t) realloc((p), (size_t)(n))
 #define NS_CALLOC(c, s)        calloc(c, s)
 
-
+#include <stdio.h>
 #define NS_LOG(...)      \
     printf(__VA_ARGS__); \
     printf("\r\n");

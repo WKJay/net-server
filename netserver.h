@@ -1,7 +1,7 @@
 #ifndef __NETSERVER_H
 #define __NETSERVER_H
 
-#include "ns_session.h"
+#include "ns_types.h"
 
 #define NS_USE_TLS       (1 << 0)
 #define NS_RESET_FLAG    (1 << 1)
@@ -11,16 +11,18 @@
  * netserver manager
  */
 typedef struct _netserver_mgr {
-    ns_session_t *listener;  // listen session
-    ns_session_t *conn;      //session list
-    uint16_t listen_port;    //server listen port
-    uint32_t max_conns;      //max connections
-    uint32_t flag;           //status flag
+    struct _ns_session *listener;  // listen session
+    struct _ns_session *conns;     // session list
+    uint16_t listen_port;          // server listen port
+    uint32_t max_conns;            // max connections
+    uint32_t flag;                 // status flag
 } netserver_mgr_t;
 
 /**
  * API definition
  */
 netserver_mgr_t *netserver_create(uint32_t max_conns, uint32_t flag);
+int netserver_bind(netserver_mgr_t *mgr, uint16_t port);
+int netserver_start(netserver_mgr_t *mgr);
 
 #endif /* __NETSERVER_H */

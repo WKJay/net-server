@@ -7,6 +7,11 @@
 typedef struct sockaddr_in ns_sockaddr_in;
 typedef int socket_t;
 
+#define ns_fd_set   fd_set
+#define NS_FD_ZERO  FD_ZERO
+#define NS_FD_SET   FD_SET
+#define NS_FD_ISSET FD_ISSET
+
 int ns_if_socket(void);
 int ns_if_bind(socket_t socket, uint16_t port);
 int ns_if_listen(socket_t socket, int backlog);
