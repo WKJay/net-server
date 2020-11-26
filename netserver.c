@@ -49,39 +49,41 @@ netserver_mgr_t *netserver_create(uint32_t max_conns, uint32_t flag) {
  * Output:  success:0
  */
 int netserver_bind(netserver_mgr_t *mgr, uint16_t port) {
-    ns_session_t *listen_session = NULL;
+    mgr->listen_port = port;
+    return 0;
+}
+
+void netserver(netserver_mgr_t *mgr) {
     if (mgr->listener) {
         NS_LOG("already have a listener");
         return -1;
     }
 
-    listen_session = ns_session_create(NS_SESSION_F_LISTENING);
-    if (listen_session == NULL) {
+    mgr->listener = ns_session_create(NS_SESSION_F_LISTENING);
+    if (mgr->listener == NULL) {
         NS_LOG("cannot create netserver session");
         return -1;
     }
 
-    listen_session->socket = ns_if_socket();
-    if (listen_session->socket < 0) {
+    mgr->listener->socket = ns_if_socket();
+    if (mgr->listener->socket < 0) {
         NS_LOG("create socket failed");
         return -1;
     }
 
-    if (ns_if_bind(listen_session->socket, port) < 0) {
+    if (ns_if_bind(mgr->listener->socket, mgr->listen_port) < 0) {
         NS_LOG("bind socket failed");
-        ns_if_socket_close(listen_session->socket);
+        ns_if_socket_close(mgr->listener->socket);
         return -1;
     }
 
-    // if (ns_if_listen(listen_session->socket, NS_IF_LISTEN_BACKLOG) < 0) {
-    //     NS_LOG("listen socket failed");
-    //     ns_if_socket_close(listen_session->socket);
-    //     return -1;
-    // }
-
-    return 0;
+    if (ns_if_listen(mgr->listener->socket, NS_IF_LISTEN_BACKLOG) < 0) {
+        NS_LOG("listen socket failed");
+        ns_if_socket_close(mgr->listener->socket);
+        return -1;
+    }
 }
 
 int netserver_start(netserver_mgr_t *mgr) {
-    
+    ns_thread_start(netserver, mgr);
 }

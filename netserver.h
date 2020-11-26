@@ -13,6 +13,7 @@
 typedef struct _netserver_mgr {
     ns_session_t *listener;  // listen session
     ns_session_t *conn;      //session list
+    uint16_t listen_port;    //server listen port
     uint32_t max_conns;      //max connections
     uint32_t flag;           //status flag
 } netserver_mgr_t;
