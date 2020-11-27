@@ -112,7 +112,8 @@ static void netserver_handle(void *param) {
     netserver_mgr_t *mgr = (netserver_mgr_t *)param;
     struct sockaddr_in servaddr;
     fd_set readset, exceptfds, tempreadfds, tempexptfds;
-    int maxfd = 0, sockfd = -1;
+    int maxfd = 0, sockfd = -1, reuse = 1;
+    unsigned long ul = 1;
     struct timeval timeout;
 
     mgr->listener = ns_session_create(mgr, NS_SESSION_F_LISTENING);
@@ -121,11 +122,13 @@ static void netserver_handle(void *param) {
         goto exit;
     }
 
-    mgr->listener->socket = socket(AF_INET, SOCK_STREAM, 0);
+    mgr->listener->socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (mgr->listener->socket < 0) {
         NS_LOG("create socket failed");
         goto exit;
     }
+    setsockopt(mgr->listener->socket, SOL_SOCKET, SO_REUSEADDR, &reuse,
+               sizeof(reuse));
 
     NS_MEMSET(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
@@ -187,8 +190,14 @@ static void netserver_handle(void *param) {
                     NS_LOG("new connection accept failed");
                     ns_session_close(mgr, new_conn);
                 } else {
-                    FD_SET(new_conn->socket, &readset);
-                    FD_SET(new_conn->socket, &exceptfds);
+                    int ret = -1;
+                    ret = ioctlsocket(new_conn->socket, FIONBIO,
+                                      (unsigned long *)&ul);
+                    if (ret < 0) {
+                        NS_LOG("set socket non-block failed");
+                    }
+                    // FD_SET(new_conn->socket, &readset);
+                    // FD_SET(new_conn->socket, &exceptfds);
                 }
             } else {
                 /* cannot create new connection,just accept and close it */
@@ -205,7 +214,7 @@ exit:
     netserver_close_all(mgr);
 }
 
-void netserver(void *param) {
+static void netserver(void *param) {
     while (1) {
         netserver_handle(param);
         rt_thread_mdelay(1000);
@@ -226,3 +235,7 @@ int netserver_start(netserver_mgr_t *mgr) {
         return -1;
     }
 }
+
+netserver_mgr_t *netserver_create_and_start(uint32_t max_conns, uint16_t port,
+                                            uint32_t conn_timeout,
+                                            uint32_t flag) {}
