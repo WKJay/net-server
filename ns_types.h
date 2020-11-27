@@ -19,8 +19,10 @@
 #define NS_CALLOC(c, s)        calloc(c, s)
 
 #include <stdio.h>
-#define NS_LOG(...)      \
-    printf(__VA_ARGS__); \
+#define NS_LOG(...)          \
+    printf("[netserver]: "); \
+    printf(__VA_ARGS__);     \
     printf("\r\n");
+    
 
 #endif /* __NS_TYPES_H */
