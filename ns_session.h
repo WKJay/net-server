@@ -21,8 +21,8 @@ typedef struct _ns_session {
     uint32_t flag;
     struct _ns_session *next;
     void *user_data;
-#if NS_SUPPORT_TLS
-    void *tls_backend;
+#if NS_ENABLE_SSL
+    void *ssl_if_data;
 #else
     void *unused_data; /* To keep the size of the structure the same */
 #endif

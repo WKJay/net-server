@@ -3,6 +3,7 @@
 
 #include <string.h>
 #include <stdint.h>
+#include "ns_cfg.h"
 
 #define NS_MEMCPY(d, s, l)   memcpy((d), (s), (l))
 #define NS_MEMSET(b, c, l)   memset((b), (c), (l))

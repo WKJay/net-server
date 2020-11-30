@@ -20,6 +20,17 @@ typedef struct _netserver_mgr {
 } netserver_mgr_t;
 
 /**
+ * netserver options
+ */
+typedef struct _netserver_opt {
+#if NS_ENABLE_SSL
+    const char *server_key;
+    const char *server_cert;
+    const char *ca_cert;
+#endif
+} netserver_opt_t;
+
+/**
  * API definition
  */
 netserver_mgr_t *netserver_create(uint32_t max_conns, uint32_t flag);

@@ -113,9 +113,9 @@ int ns_session_close(netserver_mgr_t *mgr, ns_session_t *session) {
         }
         NS_FREE(session);
     }
-#if NS_SUPPORT_TLS
-    ns_tls_free(session->tls_backend);
-    session->tls_backend = NULL;
+#if NS_ENABLE_SSL
+    ns_tls_free(session->ssl_if_data);
+    session->ssl_if_data = NULL;
 #endif
     return 0;
 }

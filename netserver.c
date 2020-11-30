@@ -45,7 +45,7 @@ netserver_mgr_t *netserver_create(uint32_t max_conns, uint32_t flag) {
         return NULL;
     }
     if (flag & NS_USE_TLS) {
-#if NS_SUPPORT_TLS
+#if NS_ENABLE_SSL
         mgr->flag |= NS_USE_TLS;
 #else
         NS_LOG("TLS SUPPORT NOT AVAILABLE");
