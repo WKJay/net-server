@@ -8,17 +8,30 @@
 #define NS_SHUTDOWN_FLAG (1 << 2)
 
 /**
+ * netserver callback
+ * */
+typedef struct _netserver_cb {
+    int (*data_readable_cb)(void *session);
+    void (*session_close_cb)(void *session);
+#if NS_ENABLE_SSL
+    int (*peer_verify_cb)(void *cert_data, int cert_size);
+#endif
+} netserver_cb_t;
+
+/**
  * netserver options
  */
 typedef struct _netserver_opt {
     uint16_t listen_port;      // server listen port
     uint32_t max_conns;        // max connections
     uint32_t session_timeout;  // session timeout
+    netserver_cb_t callback;  // callback functions
 #if NS_ENABLE_SSL
     const char *server_key;
     const char *server_cert;
     const char *ca_cert;
 #endif
+
 } netserver_opt_t;
 
 /**

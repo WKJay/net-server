@@ -10,7 +10,7 @@
     Modify:
 *************************************************/
 #include "netserver.h"
-#include "ns_session.h"
+
 #if NS_ENABLE_SSL
 #include "ns_ssl_if.h"
 #endif
@@ -33,17 +33,22 @@ static ns_session_t *find_last_connection(netserver_mgr_t *mgr, int *cnt) {
 
 static void _session_handle(netserver_mgr_t *mgr, ns_session_t *conn) {
     int ret = 0;
-    uint8_t buf[256];
-    NS_MEMSET(buf, 0, 256);
-
     conn->tick_timeout =
         rt_tick_get() + rt_tick_from_millisecond(mgr->opts->session_timeout);
-    ret = netserver_read(conn, buf, 256);
-    if (ret > 0) {
-        netserver_write(conn, buf, ret);
+
+    if (mgr->opts->callback.data_readable_cb) {
+        mgr->opts->callback.data_readable_cb(conn);
     } else {
-        NS_LOG("socket %d read err,close it", conn->socket);
-        ns_session_close(mgr, conn);
+        uint8_t buf[NS_RECV_DATA_DEFAULT_MAX_LEN];
+        NS_MEMSET(buf, 0, NS_RECV_DATA_DEFAULT_MAX_LEN);
+        // use default data handle logic
+        ret = netserver_read(conn, buf, sizeof(buf));
+        if (ret > 0) {
+            netserver_write(conn, buf, ret);
+        } else {
+            NS_LOG("socket %d read err,close it", conn->socket);
+            ns_session_close(mgr, conn);
+        }
     }
 }
 
