@@ -13,6 +13,7 @@
 
 /* Flags set by net server*/
 #define NS_SESSION_F_LISTENING (1 << 0)
+#define NS_SESSION_F_SSL       (1 << 1)
 
 typedef struct _ns_session {
     int socket;
@@ -34,4 +35,6 @@ int ns_sesion_close_all_connections(netserver_mgr_t *mgr);
 int ns_all_connections_set_fds(netserver_mgr_t *mgr, fd_set *readset,
                                fd_set *exceptfds);
 void ns_session_handle(netserver_mgr_t *mgr, fd_set *readset, fd_set *excptset);
+int netserver_read(ns_session_t *ns, void *data, int sz);
+int netserver_write(ns_session_t *ns, void *data, int sz);
 #endif /* __NS_SESSION_H */

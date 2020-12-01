@@ -51,12 +51,12 @@ static void wolfssl_backend_free(wolfssl_backend_t *backend) {
  * Brief:   create ssl interface context
  * Input:
  * @mgr:        netserver manager
- * @opts:       SSL options
  * Output:  success:0,error:-1
  */
-int ns_ssl_if_context_create(netserver_mgr_t *mgr, netserver_opt_t *opts) {
+int ns_ssl_if_context_create(netserver_mgr_t *mgr) {
     WOLFSSL_METHOD *method = NULL;
     wolfssl_backend_t *backend = NULL;
+    netserver_opt_t *opts = mgr->opts;
 
     /* Create wolfssl backend struct */
     backend = NS_CALLOC(1, sizeof(wolfssl_backend_t));
@@ -144,7 +144,7 @@ int ns_ssl_if_read(ns_session_t *session, void *data, int sz) {
     if (session->ssl_if_data == NULL) {
         NS_LOG("invalid ssl interface data.");
     }
-    WOLFSSL *ssl = (WOLFSSL *)session->ssl_if_data;
+    WOLFSSL *ssl = ((wolfssl_backend_t *)session->ssl_if_data)->ssl;
     return wolfSSL_read(ssl, data, sz);
 }
 
@@ -152,6 +152,6 @@ int ns_ssl_if_write(ns_session_t *session, void *data, int sz) {
     if (session->ssl_if_data == NULL) {
         NS_LOG("invalid ssl interface data.");
     }
-    WOLFSSL *ssl = (WOLFSSL *)session->ssl_if_data;
+    WOLFSSL *ssl = ((wolfssl_backend_t *)session->ssl_if_data)->ssl;
     return wolfSSL_write(ssl, data, sz);
 }

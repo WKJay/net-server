@@ -37,11 +37,10 @@ static void _session_handle(netserver_mgr_t *mgr, ns_session_t *conn) {
     NS_MEMSET(buf, 0, 256);
 
     conn->tick_timeout =
-        rt_tick_get() + rt_tick_from_millisecond(mgr->session_timeout);
-
-    ret = recv(conn->socket, buf, 256, 0);
+        rt_tick_get() + rt_tick_from_millisecond(mgr->opts->session_timeout);
+    ret = netserver_read(conn, buf, 256);
     if (ret > 0) {
-        send(conn->socket, buf, ret, 0);
+        netserver_write(conn, buf, ret);
     } else {
         NS_LOG("socket %d read err,close it", conn->socket);
         ns_session_close(mgr, conn);
@@ -53,7 +52,7 @@ static void _session_handle(netserver_mgr_t *mgr, ns_session_t *conn) {
  * Brief:   create netserber session
  * Input:
  *  @flag: session flag
- *         NS_USE_TLS : use tls connection
+ *         NS_USE_SSL : use tls connection
  * Output:  netserver manager handler , NULL if create failed
  */
 ns_session_t *ns_session_create(netserver_mgr_t *mgr, uint32_t flag) {
@@ -75,7 +74,7 @@ ns_session_t *ns_session_create(netserver_mgr_t *mgr, uint32_t flag) {
         int conn_cnt = 0;
         ns_session_t *last_conn = find_last_connection(mgr, &conn_cnt);
         if (last_conn) {
-            if (conn_cnt >= mgr->max_conns) {
+            if (conn_cnt >= mgr->opts->max_conns) {
                 NS_LOG("no more connections");
                 NS_FREE(session);
                 return NULL;
@@ -88,17 +87,29 @@ ns_session_t *ns_session_create(netserver_mgr_t *mgr, uint32_t flag) {
     }
 
     session->flag = flag;
+    if (mgr->flag & NS_USE_SSL) session->flag |= NS_SESSION_F_SSL;
     session->socket = -1;
     session->tick_timeout =
-        rt_tick_get() + rt_tick_from_millisecond(mgr->session_timeout);
+        rt_tick_get() + rt_tick_from_millisecond(mgr->opts->session_timeout);
     return session;
 }
 
 int ns_session_close(netserver_mgr_t *mgr, ns_session_t *session) {
     ns_session_t *iter;
 
-    if (session->socket >= 0) closesocket(session->socket);
+    /* Close socket */
+    if (session->socket >= 0) {
+        closesocket(session->socket);
+    }
 
+    /* Free ssl data */
+#if NS_ENABLE_SSL
+    if (session->flag & NS_SESSION_F_SSL) {
+        ns_ssl_if_free(session);
+    }
+#endif
+
+    /*Free session data */
     if (IS_LISTEN_SESSION(session)) {
         NS_FREE(session);
         mgr->listener = NULL;

@@ -21,6 +21,10 @@
 #include <lwip/select.h>
 #endif
 
+#if NS_ENABLE_SSL
+#include "ns_ssl_if.h"
+#endif
+
 #define NS_IF_LISTEN_BACKLOG 6
 #define NS_SELECT_TIMEOUT    2000
 
@@ -33,25 +37,25 @@
  * Name:    netserver_create
  * Brief:   create netserber manager
  * Input:
- *  @max_conns: max available connections
+ *  @opts: netserver options
  *  @flag: server flag
- *         NS_USE_TLS : use tls connection
+ *         NS_USE_SSL : use tls connection
  * Output:  netserver manager handler , NULL if create failed
  */
-netserver_mgr_t *netserver_create(uint32_t max_conns, uint32_t flag) {
+netserver_mgr_t *netserver_create(netserver_opt_t *opts, uint32_t flag) {
     netserver_mgr_t *mgr = NS_CALLOC(1, sizeof(netserver_mgr_t));
     if (mgr == NULL) {
         NS_LOG("no memory for netserver manager");
         return NULL;
     }
-    if (flag & NS_USE_TLS) {
+    if (flag & NS_USE_SSL) {
 #if NS_ENABLE_SSL
-        mgr->flag |= NS_USE_TLS;
+        mgr->flag |= NS_USE_SSL;
 #else
         NS_LOG("TLS SUPPORT NOT AVAILABLE");
 #endif
     }
-    mgr->max_conns = max_conns;
+    mgr->opts = opts;
     return mgr;
 }
 
@@ -70,7 +74,7 @@ static void netserver_close_all(netserver_mgr_t *mgr) {
 
 static void check_session_timeout(netserver_mgr_t *mgr) {
     ns_session_t *conn = NULL;
-    if (mgr->session_timeout == 0) {
+    if (mgr->opts->session_timeout == 0) {
         return;
     }
     for (conn = mgr->conns; conn; conn = conn->next) {
@@ -91,61 +95,106 @@ static void netserver_accept_and_close(netserver_mgr_t *mgr) {
         closesocket(sock);
     }
 }
+
+int netserver_read(ns_session_t *ns, void *data, int sz) {
+#if NS_ENABLE_SSL
+    if (ns->flag & NS_SESSION_F_SSL) {
+        return ns_ssl_if_read(ns, data, sz);
+    } else
+#endif
+    {
+        return recv(ns->socket, data, sz, 0);
+    }
+}
+
+int netserver_write(ns_session_t *ns, void *data, int sz) {
+    #if NS_ENABLE_SSL
+    if (ns->flag & NS_SESSION_F_SSL) {
+        return ns_ssl_if_write(ns, data, sz);
+    } else
+#endif
+    {
+        return send(ns->socket, data, sz, 0);
+    }
+}
+
 /**
- * Name:    netserver_bind
- * Brief:   bind port to netserver
+ * Name:    netserver_bind_options
+ * Brief:   bind options to netserver
  * Input:
  *  @mgr:
- *  @port:
+ *  @opts:
  * Output:  success:0
  */
-int netserver_bind(netserver_mgr_t *mgr, uint16_t port) {
-    mgr->listen_port = port;
+int netserver_bind_options(netserver_mgr_t *mgr, netserver_opt_t *opts) {
+    mgr->opts = opts;
     return 0;
 }
 
 void netserver_set_session_timeout(netserver_mgr_t *mgr, uint32_t ms) {
-    mgr->session_timeout = ms;
+    mgr->opts->session_timeout = ms;
 }
 
-static void netserver_handle(void *param) {
-    netserver_mgr_t *mgr = (netserver_mgr_t *)param;
+static int listen_socket_create(netserver_mgr_t *mgr) {
+    int reuse = 1;
     struct sockaddr_in servaddr;
-    fd_set readset, exceptfds, tempreadfds, tempexptfds;
-    int maxfd = 0, sockfd = -1, reuse = 1;
-    unsigned long ul = 1;
-    struct timeval timeout;
 
     mgr->listener = ns_session_create(mgr, NS_SESSION_F_LISTENING);
     if (mgr->listener == NULL) {
         NS_LOG("cannot create netserver session");
-        goto exit;
+        return -1;
     }
 
-    mgr->listener->socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    mgr->listener->socket = socket(AF_INET, SOCK_STREAM, 0);
     if (mgr->listener->socket < 0) {
-        NS_LOG("create socket failed");
-        goto exit;
+        printf("create socket failed.\r\n");
+        return -1;
     }
     setsockopt(mgr->listener->socket, SOL_SOCKET, SO_REUSEADDR, &reuse,
                sizeof(reuse));
 
-    NS_MEMSET(&servaddr, 0, sizeof(servaddr));
+    rt_memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port = htons(mgr->listen_port);
+    servaddr.sin_port = htons(mgr->opts->listen_port);
+
     if (bind(mgr->listener->socket, (struct sockaddr *)&servaddr,
-             sizeof(servaddr)) < 0) {
-        NS_LOG("bind socket failed");
+             sizeof(servaddr)) == -1) {
+        printf("socket %d bind failed.\r\n", mgr->listener->socket);
         closesocket(mgr->listener->socket);
-        goto exit;
+        return -1;
     }
 
     if (listen(mgr->listener->socket, NS_IF_LISTEN_BACKLOG) < 0) {
-        NS_LOG("listen socket failed");
+        printf("socket %d listen failed.\r\n", mgr->listener->socket);
         closesocket(mgr->listener->socket);
+        return -1;
+    }
+
+    return 0;
+}
+
+static void netserver_handle(void *param) {
+    netserver_mgr_t *mgr = (netserver_mgr_t *)param;
+    fd_set readset, exceptfds, tempreadfds, tempexptfds;
+    int maxfd = 0, sockfd = -1;
+    unsigned long ul = 1;
+    struct timeval timeout;
+
+    /* Create listen socket */
+    if (listen_socket_create(mgr) < 0) {
+        NS_LOG("create socket failed.");
         goto exit;
     }
+
+#if NS_ENABLE_SSL
+    /* Create ssl context*/
+    if (mgr->flag & NS_USE_SSL) {
+        if (ns_ssl_if_context_create(mgr) < 0) {
+            NS_LOG("create ssl context failed.");
+        }
+    }
+#endif
 
     timeout.tv_sec = NS_SELECT_TIMEOUT / 1000;
     timeout.tv_usec = (NS_SELECT_TIMEOUT % 1000) * 1000;
@@ -191,10 +240,22 @@ static void netserver_handle(void *param) {
                     ns_session_close(mgr, new_conn);
                 } else {
                     int ret = -1;
-                    ret = ioctlsocket(new_conn->socket, FIONBIO,
-                                      (unsigned long *)&ul);
-                    if (ret < 0) {
-                        NS_LOG("set socket non-block failed");
+#if NS_ENABLE_SSL
+                    /* Do handshake */
+                    if (mgr->flag & NS_USE_SSL) {
+                        if (ns_ssl_if_handshake(mgr, new_conn) < 0) {
+                            NS_LOG("ssl handshake failed.");
+                            ns_session_close(mgr, new_conn);
+                            new_conn = NULL;
+                        }
+                    }
+#endif
+                    if (new_conn) {
+                        ret = ioctlsocket(new_conn->socket, FIONBIO,
+                                          (unsigned long *)&ul);
+                        if (ret < 0) {
+                            NS_LOG("set socket non-block failed");
+                        }
                     }
                     // FD_SET(new_conn->socket, &readset);
                     // FD_SET(new_conn->socket, &exceptfds);
@@ -235,7 +296,3 @@ int netserver_start(netserver_mgr_t *mgr) {
         return -1;
     }
 }
-
-netserver_mgr_t *netserver_create_and_start(uint32_t max_conns, uint16_t port,
-                                            uint32_t conn_timeout,
-                                            uint32_t flag) {}
