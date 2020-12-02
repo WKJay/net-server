@@ -33,10 +33,12 @@ typedef struct _ns_session {
  * netserver callback
  * */
 typedef struct _netserver_cb {
-    int (*data_readable_cb)(ns_session_t *session, void *data, int sz);
+    void (*session_create_cb)(ns_session_t *session);
     void (*session_close_cb)(ns_session_t *session);
+    int (*data_readable_cb)(ns_session_t *session, void *data, int sz);
 #if NS_ENABLE_SSL
-    int (*peer_verify_cb)(void *cert_data, int cert_size);
+    int (*ssl_handshake_cb)(ns_session_t *session, void *cert_data,
+                          int cert_size);
 #endif
 } netserver_cb_t;
 

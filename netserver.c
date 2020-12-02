@@ -20,7 +20,6 @@
 #include <lwip/select.h>
 #endif
 
-
 #if NS_ENABLE_SSL
 #include "ns_ssl_if.h"
 #endif
@@ -136,6 +135,10 @@ static int ns_session_close(netserver_mgr_t *mgr, ns_session_t *session) {
                 }
             }
         }
+        /* notify user */
+        if (mgr->opts->callback.session_close_cb) {
+            mgr->opts->callback.session_close_cb(session);
+        }
         NS_FREE(session);
     }
     return 0;
@@ -198,7 +201,7 @@ static int ns_sesion_close_all_connections(netserver_mgr_t *mgr) {
  * Output:  maximal fd number
  */
 static int ns_all_connections_set_fds(netserver_mgr_t *mgr, fd_set *readset,
-                               fd_set *exceptfds) {
+                                      fd_set *exceptfds) {
     int maxfdp1 = 0;
     ns_session_t *session;
 
@@ -211,7 +214,7 @@ static int ns_all_connections_set_fds(netserver_mgr_t *mgr, fd_set *readset,
 }
 
 static void ns_session_handle(netserver_mgr_t *mgr, fd_set *readset,
-                       fd_set *excptset) {
+                              fd_set *excptset) {
     ns_session_t *cur_conn, *next_conn;
 
     for (cur_conn = mgr->conns; cur_conn; cur_conn = next_conn) {
@@ -225,7 +228,6 @@ static void ns_session_handle(netserver_mgr_t *mgr, fd_set *readset,
         }
     }
 }
-
 
 /*------------------------------------------------------------------------------------//
                                     NET SERVER
@@ -451,6 +453,10 @@ static void netserver_handle(void *param) {
 
             ns_session_t *new_conn = ns_session_create(mgr, NULL);
             if (new_conn) {
+                /* notify user */
+                if (mgr->opts->callback.session_create_cb)
+                    mgr->opts->callback.session_create_cb(new_conn);
+
                 new_conn->socket =
                     accept(mgr->listener->socket,
                            (struct sockaddr *)&new_conn->cliaddr, &clilen);

@@ -11,6 +11,7 @@
 *************************************************/
 #include <wolfssl/options.h>
 #include <wolfssl/ssl.h>
+#include <wolfssl/internal.h>
 
 #include "netserver.h"
 
@@ -61,6 +62,8 @@ int ns_ssl_if_context_create(netserver_mgr_t *mgr) {
     /* Init wolfSSL library */
     wolfSSL_Init();
 
+    //wolfSSL_Debugging_ON();
+
     /* Create wolfSSL context */
     method = wolfTLSv1_2_server_method();
     backend->ctx = wolfSSL_CTX_new(method);
@@ -85,6 +88,16 @@ int ns_ssl_if_context_create(netserver_mgr_t *mgr) {
         NS_LOG("load certificate %s failed.", opts->server_cert);
         goto exit;
     }
+    if (opts->ca_cert) {
+        if (wolfSSL_CTX_load_verify_locations_ex(
+                backend->ctx, opts->ca_cert, NULL,
+                WOLFSSL_LOAD_FLAG_DATE_ERR_OKAY) != SSL_SUCCESS) {
+            NS_LOG("load ca %s failed.", opts->ca_cert);
+            goto exit;
+        }
+    }
+
+    wolfSSL_CTX_set_verify(backend->ctx, SSL_VERIFY_PEER, NULL);
 
     mgr->listener->ssl_if_data = backend;
     return 0;
@@ -122,6 +135,12 @@ int ns_ssl_if_handshake(netserver_mgr_t *mgr, ns_session_t *session) {
         }
     } while (wolfSSL_want_read(backend->ssl));
     session->ssl_if_data = backend;
+    /* notify user */
+    if (mgr->opts->callback.ssl_handshake_cb) {
+        DerBuffer *peerCert = backend->ssl->peerCert.derCert;
+        mgr->opts->callback.ssl_handshake_cb(session, peerCert->buffer,
+                                             peerCert->length);
+    }
     return 0;
 
 exit:
