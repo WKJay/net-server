@@ -13,7 +13,6 @@
 #include <wolfssl/ssl.h>
 
 #include "netserver.h"
-#include "ns_session.h"
 
 #define CHECK_IF_MEMORY_ALLOCATED(ptr, name, ret) \
     if (ptr == NULL) {                            \
@@ -24,7 +23,6 @@
 typedef struct _wolfssl_backend {
     WOLFSSL_CTX *ctx;  // only for listen session
     WOLFSSL *ssl;      // for client connections
-    // void *user_data;   // user specific data
 } wolfssl_backend_t;
 
 static void wolfssl_backend_free(wolfssl_backend_t *backend) {
@@ -39,8 +37,6 @@ static void wolfssl_backend_free(wolfssl_backend_t *backend) {
         wolfSSL_free(backend->ssl);
         backend->ssl = NULL;
     }
-
-    /* call user function to free user data */
 
     /* free backend */
     NS_FREE(backend);

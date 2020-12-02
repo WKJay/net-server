@@ -2,7 +2,6 @@
 #define __NS_SSL_IF_H
 
 #include "netserver.h"
-#include "ns_session.h"
 
 int ns_ssl_if_context_create(netserver_mgr_t *mgr);
 int ns_ssl_if_handshake(netserver_mgr_t *mgr, ns_session_t *conn);

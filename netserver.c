@@ -12,7 +12,6 @@
 #include <rtthread.h>
 
 #include "netserver.h"
-#include "ns_session.h"
 #include <sys/time.h>
 
 #ifdef SAL_USING_POSIX
@@ -21,9 +20,14 @@
 #include <lwip/select.h>
 #endif
 
+
 #if NS_ENABLE_SSL
 #include "ns_ssl_if.h"
 #endif
+
+/* Flags set by net server*/
+#define NS_SESSION_F_LISTENING (1 << 0)
+#define NS_SESSION_F_SSL       (1 << 1)
 
 #define NS_IF_LISTEN_BACKLOG 6
 #define NS_SELECT_TIMEOUT    2000
@@ -33,6 +37,199 @@
 #define NS_THREAD_TICK       5
 
 #define NS_IS_RESET(s) (s & NS_RESET_FLAG)
+
+#define IS_LISTEN_SESSION(s) (s->flag & NS_SESSION_F_LISTENING)
+
+/*------------------------------------------------------------------------------------//
+                                    SESSION
+//------------------------------------------------------------------------------------*/
+
+static ns_session_t *find_last_connection(netserver_mgr_t *mgr, int *cnt) {
+    ns_session_t *conn = mgr->conns;
+    if (mgr->conns == NULL) {
+        /* There's no connection */
+        return NULL;
+    }
+    (*cnt)++;
+    while (conn->next) {
+        conn = conn->next;
+        (*cnt)++;
+    }
+    return conn;
+}
+
+/**
+ * Name:    ns_session_create
+ * Brief:   create netserber session
+ * Input:
+ *  @flag: session flag
+ *         NS_USE_SSL : use tls connection
+ * Output:  netserver manager handler , NULL if create failed
+ */
+static ns_session_t *ns_session_create(netserver_mgr_t *mgr, uint32_t flag) {
+    ns_session_t *session = NS_CALLOC(1, sizeof(ns_session_t));
+    if (session == NULL) {
+        NS_LOG("no memory for ns session");
+        return NULL;
+    }
+
+    if (flag & NS_SESSION_F_LISTENING) {
+        if (mgr->listener) {
+            NS_LOG("already have a listener");
+            NS_FREE(session);
+            return NULL;
+        } else {
+            mgr->listener = session;
+        }
+    } else {
+        int conn_cnt = 0;
+        ns_session_t *last_conn = find_last_connection(mgr, &conn_cnt);
+        if (last_conn) {
+            if (conn_cnt >= mgr->opts->max_conns) {
+                NS_LOG("no more connections");
+                NS_FREE(session);
+                return NULL;
+            } else {
+                last_conn->next = session;
+            }
+        } else {
+            mgr->conns = session;
+        }
+    }
+
+    session->flag = flag;
+    if (mgr->flag & NS_USE_SSL) session->flag |= NS_SESSION_F_SSL;
+    session->socket = -1;
+    session->tick_timeout =
+        rt_tick_get() + rt_tick_from_millisecond(mgr->opts->session_timeout);
+    return session;
+}
+
+static int ns_session_close(netserver_mgr_t *mgr, ns_session_t *session) {
+    ns_session_t *iter;
+
+    /* Close socket */
+    if (session->socket >= 0) {
+        closesocket(session->socket);
+    }
+
+    /* Free ssl data */
+#if NS_ENABLE_SSL
+    if (session->flag & NS_SESSION_F_SSL) {
+        ns_ssl_if_free(session);
+    }
+#endif
+
+    /*Free session data */
+    if (IS_LISTEN_SESSION(session)) {
+        NS_FREE(session);
+        mgr->listener = NULL;
+    } else {
+        /* client session free */
+        if (mgr->conns == session) {
+            mgr->conns = session->next;
+        } else {
+            for (iter = mgr->conns; iter; iter = iter->next) {
+                if (iter->next == session) {
+                    iter->next = session->next;
+                    break;
+                }
+            }
+        }
+        NS_FREE(session);
+    }
+    return 0;
+}
+
+static void _session_handle(netserver_mgr_t *mgr, ns_session_t *conn) {
+    int ret = 0;
+    void *data_buff = mgr->data_buff;
+    uint32_t buff_sz = mgr->opts->data_pkg_max_size;
+    conn->tick_timeout =
+        rt_tick_get() + rt_tick_from_millisecond(mgr->opts->session_timeout);
+
+    ret = netserver_read(conn, data_buff, buff_sz);
+    /* close session if error occured */
+    if (ret <= 0) {
+        NS_LOG("socket %d read err,close it", conn->socket);
+        ns_session_close(mgr, conn);
+        return;
+    }
+    /* warn user if data buffer is full */
+    if (ret == buff_sz) {
+        NS_LOG("net server data buffer is full. current buffer size is %d",
+               buff_sz);
+    }
+    /* handle data package */
+    if (mgr->opts->callback.data_readable_cb) {
+        ret = mgr->opts->callback.data_readable_cb(conn, data_buff, ret);
+    } else {
+        // use default data handle logic
+        if (ret > 0) {
+            ret = netserver_write(conn, data_buff, ret);
+        }
+    }
+}
+
+/**
+ * Name:    ns_sesion_free_all_connections
+ * Brief:   This function will free all connections
+ *          except listen session
+ * Input:   None
+ * Output:  success:0
+ */
+static int ns_sesion_close_all_connections(netserver_mgr_t *mgr) {
+    ns_session_t *cur_conn, *next_conn;
+    for (cur_conn = mgr->conns; cur_conn; cur_conn = next_conn) {
+        /* obtain next connection in case it be closed */
+        next_conn = cur_conn->next;
+        if (ns_session_close(mgr, cur_conn) < 0) {
+            NS_LOG("close session failed");
+            return -1;
+        }
+    }
+    return 0;
+}
+
+/**
+ * Name:    ns_all_connections_set_fds
+ * Brief:   set all connections fds
+ * Input:   None
+ * Output:  maximal fd number
+ */
+static int ns_all_connections_set_fds(netserver_mgr_t *mgr, fd_set *readset,
+                               fd_set *exceptfds) {
+    int maxfdp1 = 0;
+    ns_session_t *session;
+
+    for (session = mgr->conns; session; session = session->next) {
+        if (maxfdp1 < session->socket + 1) maxfdp1 = session->socket + 1;
+        FD_SET(session->socket, readset);
+        FD_SET(session->socket, exceptfds);
+    }
+    return maxfdp1;
+}
+
+static void ns_session_handle(netserver_mgr_t *mgr, fd_set *readset,
+                       fd_set *excptset) {
+    ns_session_t *cur_conn, *next_conn;
+
+    for (cur_conn = mgr->conns; cur_conn; cur_conn = next_conn) {
+        // obtain next session in case current session be closed
+        next_conn = cur_conn->next;
+        if (FD_ISSET(cur_conn->socket, excptset)) {
+            NS_LOG("socket %d error,now close", cur_conn->socket);
+            ns_session_close(mgr, cur_conn);
+        } else if (FD_ISSET(cur_conn->socket, readset)) {
+            _session_handle(mgr, cur_conn);
+        }
+    }
+}
+
+
+/*------------------------------------------------------------------------------------//
+                                    NET SERVER
+//------------------------------------------------------------------------------------*/
 /**
  * Name:    netserver_create
  * Brief:   create netserber manager
@@ -54,6 +251,15 @@ netserver_mgr_t *netserver_create(netserver_opt_t *opts, uint32_t flag) {
 #else
         NS_LOG("TLS SUPPORT NOT AVAILABLE");
 #endif
+    }
+    if (opts->data_pkg_max_size == 0) {
+        opts->data_pkg_max_size = NS_DATA_PKG_MAX_SIZE_DEFAULT;
+    }
+    mgr->data_buff = NS_CALLOC(1, opts->data_pkg_max_size);
+    if (mgr->data_buff == NULL) {
+        NS_LOG("no memory for data buffer.");
+        NS_FREE(mgr);
+        return NULL;
     }
     mgr->opts = opts;
     return mgr;
@@ -108,7 +314,7 @@ int netserver_read(ns_session_t *ns, void *data, int sz) {
 }
 
 int netserver_write(ns_session_t *ns, void *data, int sz) {
-    #if NS_ENABLE_SSL
+#if NS_ENABLE_SSL
     if (ns->flag & NS_SESSION_F_SSL) {
         return ns_ssl_if_write(ns, data, sz);
     } else
@@ -116,6 +322,19 @@ int netserver_write(ns_session_t *ns, void *data, int sz) {
     {
         return send(ns->socket, data, sz, 0);
     }
+}
+
+int netserver_mgr_free(netserver_mgr_t *mgr) {
+    if (mgr->conns || mgr->listener) {
+        NS_LOG("still have connection, can't free mgr.");
+        return -1;
+    }
+    if (mgr->data_buff) {
+        NS_LOG("buffer not freed, can't free mgr.");
+        return -1;
+    }
+    NS_FREE(mgr);
+    return 0;
 }
 
 /**
