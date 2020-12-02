@@ -8,9 +8,11 @@
 #include <lwip/sockets.h>
 #endif
 
-#define NS_USE_SSL       (1 << 0)
-#define NS_RESET_FLAG    (1 << 1)
-#define NS_SHUTDOWN_FLAG (1 << 2)
+#define NS_USE_SSL             (1 << 0)
+#define NS_RESET_FLAG          (1 << 1)
+#define NS_SHUTDOWN_FLAG       (1 << 2)
+#define NS_SSL_VERIFY_PEER     (1 << 5)
+#define NS_SSL_FORCE_PEER_CERT (1 << 6)  // if no peer cert , handshake fails
 
 /**
  * netserver session struct
@@ -38,7 +40,7 @@ typedef struct _netserver_cb {
     int (*data_readable_cb)(ns_session_t *session, void *data, int sz);
 #if NS_ENABLE_SSL
     int (*ssl_handshake_cb)(ns_session_t *session, void *cert_data,
-                          int cert_size);
+                            int cert_size);
 #endif
 } netserver_cb_t;
 
@@ -66,7 +68,7 @@ typedef struct _netserver_mgr {
     ns_session_t *listener;  // listen session
     ns_session_t *conns;     // session list
     uint8_t *data_buff;      // data buffer
-    netserver_opt_t opts;   // options
+    netserver_opt_t opts;    // options
     uint32_t flag;           // status flag
 } netserver_mgr_t;
 
@@ -80,5 +82,6 @@ int netserver_mgr_free(netserver_mgr_t *mgr);
 void netserver_set_session_timeout(netserver_mgr_t *mgr, uint32_t ms);
 int netserver_read(ns_session_t *ns, void *data, int sz);
 int netserver_write(ns_session_t *ns, void *data, int sz);
+void netserver_restart(netserver_mgr_t *mgr);
 
 #endif /* __NETSERVER_H */

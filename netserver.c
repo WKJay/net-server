@@ -247,13 +247,8 @@ netserver_mgr_t *netserver_create(netserver_opt_t *opts, uint32_t flag) {
         NS_LOG("no memory for netserver manager");
         return NULL;
     }
-    if (flag & NS_USE_SSL) {
-#if NS_ENABLE_SSL
-        mgr->flag |= NS_USE_SSL;
-#else
-        NS_LOG("TLS SUPPORT NOT AVAILABLE");
-#endif
-    }
+    mgr->flag = flag;
+
     if (opts->data_pkg_max_size == 0) {
         opts->data_pkg_max_size = NS_DATA_PKG_MAX_SIZE_DEFAULT;
     }
@@ -263,7 +258,7 @@ netserver_mgr_t *netserver_create(netserver_opt_t *opts, uint32_t flag) {
         NS_FREE(mgr);
         return NULL;
     }
-    NS_MEMCPY(&mgr->opts,opts,sizeof(netserver_opt_t));
+    NS_MEMCPY(&mgr->opts, opts, sizeof(netserver_opt_t));
     return mgr;
 }
 
@@ -343,6 +338,15 @@ void netserver_set_session_timeout(netserver_mgr_t *mgr, uint32_t ms) {
     mgr->opts.session_timeout = ms;
 }
 
+/**
+ * Name:    netserver_restart
+ * Brief:   this function will close all connections and restart server
+ *          this will reload ssl certificates
+ * Input:   netserver mananger
+ * Output:  None
+ */
+void netserver_restart(netserver_mgr_t *mgr) { mgr->flag |= NS_RESET_FLAG; }
+
 static int listen_socket_create(netserver_mgr_t *mgr) {
     int reuse = 1;
     struct sockaddr_in servaddr;
@@ -389,6 +393,9 @@ static void netserver_handle(void *param) {
     unsigned long ul = 1;
     struct timeval timeout;
 
+    /* Clear reset flag */
+    mgr->flag &= ~(NS_RESET_FLAG);
+
     /* Create listen socket */
     if (listen_socket_create(mgr) < 0) {
         NS_LOG("create socket failed.");
@@ -422,10 +429,17 @@ static void netserver_handle(void *param) {
         tempexptfds = exceptfds;
 
         sockfd = select(maxfd, &tempreadfds, NULL, &tempexptfds, &timeout);
+
+        if (mgr->flag & NS_RESET_FLAG) {
+            NS_LOG("SSL server reseting ...");
+            goto exit;
+        }
+
         if (NS_IS_RESET(mgr->flag)) {
             NS_LOG("net server reseting...");
             goto exit;
         }
+
         check_session_timeout(mgr);
         if (sockfd == 0) {
             // NS_LOG("net server select timeout");

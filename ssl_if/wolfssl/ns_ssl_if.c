@@ -54,6 +54,7 @@ int ns_ssl_if_context_create(netserver_mgr_t *mgr) {
     WOLFSSL_METHOD *method = NULL;
     wolfssl_backend_t *backend = NULL;
     netserver_opt_t *opts = &mgr->opts;
+    int mode = 0;
 
     /* Create wolfssl backend struct */
     backend = NS_CALLOC(1, sizeof(wolfssl_backend_t));
@@ -62,7 +63,7 @@ int ns_ssl_if_context_create(netserver_mgr_t *mgr) {
     /* Init wolfSSL library */
     wolfSSL_Init();
 
-    //wolfSSL_Debugging_ON();
+    // wolfSSL_Debugging_ON();
 
     /* Create wolfSSL context */
     method = wolfTLSv1_2_server_method();
@@ -97,7 +98,11 @@ int ns_ssl_if_context_create(netserver_mgr_t *mgr) {
         }
     }
 
-    wolfSSL_CTX_set_verify(backend->ctx, SSL_VERIFY_PEER, NULL);
+    /* set verify mode */
+    if (mgr->flag & NS_SSL_VERIFY_PEER) mode |= SSL_VERIFY_PEER;
+    if (mgr->flag & NS_SSL_FORCE_PEER_CERT)
+        mode |= SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+    if (mode) wolfSSL_CTX_set_verify(backend->ctx, mode, NULL);
 
     mgr->listener->ssl_if_data = backend;
     return 0;
@@ -137,9 +142,13 @@ int ns_ssl_if_handshake(netserver_mgr_t *mgr, ns_session_t *session) {
     session->ssl_if_data = backend;
     /* notify user */
     if (mgr->opts.callback.ssl_handshake_cb) {
-        DerBuffer *peerCert = backend->ssl->peerCert.derCert;
-        mgr->opts.callback.ssl_handshake_cb(session, peerCert->buffer,
-                                             peerCert->length);
+        if (backend->ssl->peerCert.derCert) {
+            DerBuffer *peerCert = backend->ssl->peerCert.derCert;
+            mgr->opts.callback.ssl_handshake_cb(session, peerCert->buffer,
+                                                peerCert->length);
+        } else {
+            mgr->opts.callback.ssl_handshake_cb(session, NULL, 0);
+        }
     }
     return 0;
 
