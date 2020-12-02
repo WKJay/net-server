@@ -66,7 +66,7 @@ typedef struct _netserver_mgr {
     ns_session_t *listener;  // listen session
     ns_session_t *conns;     // session list
     uint8_t *data_buff;      // data buffer
-    netserver_opt_t *opts;   // options
+    netserver_opt_t opts;   // options
     uint32_t flag;           // status flag
 } netserver_mgr_t;
 

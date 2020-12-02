@@ -53,7 +53,7 @@ static void wolfssl_backend_free(wolfssl_backend_t *backend) {
 int ns_ssl_if_context_create(netserver_mgr_t *mgr) {
     WOLFSSL_METHOD *method = NULL;
     wolfssl_backend_t *backend = NULL;
-    netserver_opt_t *opts = mgr->opts;
+    netserver_opt_t *opts = &mgr->opts;
 
     /* Create wolfssl backend struct */
     backend = NS_CALLOC(1, sizeof(wolfssl_backend_t));
@@ -136,9 +136,9 @@ int ns_ssl_if_handshake(netserver_mgr_t *mgr, ns_session_t *session) {
     } while (wolfSSL_want_read(backend->ssl));
     session->ssl_if_data = backend;
     /* notify user */
-    if (mgr->opts->callback.ssl_handshake_cb) {
+    if (mgr->opts.callback.ssl_handshake_cb) {
         DerBuffer *peerCert = backend->ssl->peerCert.derCert;
-        mgr->opts->callback.ssl_handshake_cb(session, peerCert->buffer,
+        mgr->opts.callback.ssl_handshake_cb(session, peerCert->buffer,
                                              peerCert->length);
     }
     return 0;

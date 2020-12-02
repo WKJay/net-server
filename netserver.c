@@ -84,7 +84,7 @@ static ns_session_t *ns_session_create(netserver_mgr_t *mgr, uint32_t flag) {
         int conn_cnt = 0;
         ns_session_t *last_conn = find_last_connection(mgr, &conn_cnt);
         if (last_conn) {
-            if (conn_cnt >= mgr->opts->max_conns) {
+            if (conn_cnt >= mgr->opts.max_conns) {
                 NS_LOG("no more connections");
                 NS_FREE(session);
                 return NULL;
@@ -100,7 +100,7 @@ static ns_session_t *ns_session_create(netserver_mgr_t *mgr, uint32_t flag) {
     if (mgr->flag & NS_USE_SSL) session->flag |= NS_SESSION_F_SSL;
     session->socket = -1;
     session->tick_timeout =
-        rt_tick_get() + rt_tick_from_millisecond(mgr->opts->session_timeout);
+        rt_tick_get() + rt_tick_from_millisecond(mgr->opts.session_timeout);
     return session;
 }
 
@@ -136,8 +136,8 @@ static int ns_session_close(netserver_mgr_t *mgr, ns_session_t *session) {
             }
         }
         /* notify user */
-        if (mgr->opts->callback.session_close_cb) {
-            mgr->opts->callback.session_close_cb(session);
+        if (mgr->opts.callback.session_close_cb) {
+            mgr->opts.callback.session_close_cb(session);
         }
         NS_FREE(session);
     }
@@ -147,9 +147,9 @@ static int ns_session_close(netserver_mgr_t *mgr, ns_session_t *session) {
 static void _session_handle(netserver_mgr_t *mgr, ns_session_t *conn) {
     int ret = 0;
     void *data_buff = mgr->data_buff;
-    uint32_t buff_sz = mgr->opts->data_pkg_max_size;
+    uint32_t buff_sz = mgr->opts.data_pkg_max_size;
     conn->tick_timeout =
-        rt_tick_get() + rt_tick_from_millisecond(mgr->opts->session_timeout);
+        rt_tick_get() + rt_tick_from_millisecond(mgr->opts.session_timeout);
 
     ret = netserver_read(conn, data_buff, buff_sz);
     /* close session if error occured */
@@ -164,8 +164,8 @@ static void _session_handle(netserver_mgr_t *mgr, ns_session_t *conn) {
                buff_sz);
     }
     /* handle data package */
-    if (mgr->opts->callback.data_readable_cb) {
-        ret = mgr->opts->callback.data_readable_cb(conn, data_buff, ret);
+    if (mgr->opts.callback.data_readable_cb) {
+        ret = mgr->opts.callback.data_readable_cb(conn, data_buff, ret);
     } else {
         // use default data handle logic
         if (ret > 0) {
@@ -263,7 +263,7 @@ netserver_mgr_t *netserver_create(netserver_opt_t *opts, uint32_t flag) {
         NS_FREE(mgr);
         return NULL;
     }
-    mgr->opts = opts;
+    NS_MEMCPY(&mgr->opts,opts,sizeof(netserver_opt_t));
     return mgr;
 }
 
@@ -282,7 +282,7 @@ static void netserver_close_all(netserver_mgr_t *mgr) {
 
 static void check_session_timeout(netserver_mgr_t *mgr) {
     ns_session_t *conn = NULL;
-    if (mgr->opts->session_timeout == 0) {
+    if (mgr->opts.session_timeout == 0) {
         return;
     }
     for (conn = mgr->conns; conn; conn = conn->next) {
@@ -339,21 +339,8 @@ int netserver_mgr_free(netserver_mgr_t *mgr) {
     return 0;
 }
 
-/**
- * Name:    netserver_bind_options
- * Brief:   bind options to netserver
- * Input:
- *  @mgr:
- *  @opts:
- * Output:  success:0
- */
-int netserver_bind_options(netserver_mgr_t *mgr, netserver_opt_t *opts) {
-    mgr->opts = opts;
-    return 0;
-}
-
 void netserver_set_session_timeout(netserver_mgr_t *mgr, uint32_t ms) {
-    mgr->opts->session_timeout = ms;
+    mgr->opts.session_timeout = ms;
 }
 
 static int listen_socket_create(netserver_mgr_t *mgr) {
@@ -377,7 +364,7 @@ static int listen_socket_create(netserver_mgr_t *mgr) {
     rt_memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port = htons(mgr->opts->listen_port);
+    servaddr.sin_port = htons(mgr->opts.listen_port);
 
     if (bind(mgr->listener->socket, (struct sockaddr *)&servaddr,
              sizeof(servaddr)) == -1) {
@@ -454,8 +441,8 @@ static void netserver_handle(void *param) {
             ns_session_t *new_conn = ns_session_create(mgr, NULL);
             if (new_conn) {
                 /* notify user */
-                if (mgr->opts->callback.session_create_cb)
-                    mgr->opts->callback.session_create_cb(new_conn);
+                if (mgr->opts.callback.session_create_cb)
+                    mgr->opts.callback.session_create_cb(new_conn);
 
                 new_conn->socket =
                     accept(mgr->listener->socket,
