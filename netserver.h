@@ -44,15 +44,22 @@ typedef struct _netserver_cb {
 #endif
 } netserver_cb_t;
 
+typedef struct _thread_attrs {
+    uint32_t stack_size;
+    uint8_t priority;
+    uint32_t tick;
+} thread_attrs_t;
+
 /**
  * netserver options
  */
 typedef struct _netserver_opt {
-    uint16_t listen_port;        // server listen port
-    uint32_t data_pkg_max_size;  // max size of data package
-    uint32_t max_conns;          // max connections
-    uint32_t session_timeout;    // session timeout
-    netserver_cb_t callback;     // callback functions
+    uint16_t listen_port;         // server listen port
+    uint32_t data_pkg_max_size;   // max size of data package
+    uint32_t max_conns;           // max connections
+    uint32_t session_timeout;     // session timeout
+    netserver_cb_t callback;      // callback functions
+    thread_attrs_t thread_attrs;  // server thread attrs
 #if NS_ENABLE_SSL
     const char *server_key;
     const char *server_cert;

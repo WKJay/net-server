@@ -509,9 +509,20 @@ static void netserver(void *param) {
 }
 
 int netserver_start(netserver_mgr_t *mgr) {
+    uint32_t stack_size = 0, tick = 0;
+    uint8_t priority = 0;
+
+    stack_size = mgr->opts.thread_attrs.stack_size
+                     ? mgr->opts.thread_attrs.stack_size
+                     : NS_THREAD_STACK_SIZE_DEFAULT;
+    tick = mgr->opts.thread_attrs.tick ? mgr->opts.thread_attrs.tick
+                                       : NS_THREAD_TICK_DEFAULT;
+    priority = mgr->opts.thread_attrs.priority ? mgr->opts.thread_attrs.priority
+                                               : NS_THREAD_PRIORITY_DEFAULT;
+
     rt_thread_t tid =
-        rt_thread_create("netserver", netserver, mgr, NS_THREAD_STACK_SIZE,
-                         NS_THREAD_PRIORITY, NS_THREAD_TICK);
+        rt_thread_create("netserver", netserver, mgr, stack_size,
+                         priority, tick);
     if (tid) {
         if (rt_thread_startup(tid) == RT_EOK) {
             return 0;
