@@ -327,8 +327,8 @@ int netserver_mgr_free(netserver_mgr_t *mgr) {
         return -1;
     }
     if (mgr->data_buff) {
-        NS_LOG("buffer not freed, can't free mgr.");
-        return -1;
+        NS_FREE(mgr->data_buff);
+        mgr->data_buff = NULL;
     }
     NS_FREE(mgr);
     return 0;
