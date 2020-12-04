@@ -430,11 +430,6 @@ static void netserver_handle(void *param) {
 
         sockfd = select(maxfd, &tempreadfds, NULL, &tempexptfds, &timeout);
 
-        if (mgr->flag & NS_RESET_FLAG) {
-            NS_LOG("SSL server reseting ...");
-            goto exit;
-        }
-
         if (NS_IS_RESET(mgr->flag)) {
             NS_LOG("net server reseting...");
             goto exit;
