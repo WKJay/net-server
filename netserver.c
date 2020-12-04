@@ -444,6 +444,10 @@ static void netserver_handle(void *param) {
         if (sockfd == 0) {
             // NS_LOG("net server select timeout");
             continue;
+        } else if (sockfd == -1) {
+            // maybe netdev is down, we close all connections and try to reset
+            // server.
+            goto exit;
         }
 
         /* if the listen fd is ready*/
@@ -520,9 +524,8 @@ int netserver_start(netserver_mgr_t *mgr) {
     priority = mgr->opts.thread_attrs.priority ? mgr->opts.thread_attrs.priority
                                                : NS_THREAD_PRIORITY_DEFAULT;
 
-    rt_thread_t tid =
-        rt_thread_create("netserver", netserver, mgr, stack_size,
-                         priority, tick);
+    rt_thread_t tid = rt_thread_create("netserver", netserver, mgr, stack_size,
+                                       priority, tick);
     if (tid) {
         if (rt_thread_startup(tid) == RT_EOK) {
             return 0;
