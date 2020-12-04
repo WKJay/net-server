@@ -478,15 +478,16 @@ static void netserver_handle(void *param) {
                             /* when user return -1, we close connection */
                             ns_session_close(mgr, new_conn);
                             new_conn = NULL;
+                            goto session_handle;
                         }
                     }
 #if NS_ENABLE_SSL
                     /* Do handshake */
                     if (mgr->flag & NS_USE_SSL) {
                         if (ns_ssl_if_handshake(mgr, new_conn) < 0) {
-                            NS_LOG("ssl handshake failed.");
                             ns_session_close(mgr, new_conn);
                             new_conn = NULL;
+                            goto session_handle;
                         }
                     }
 #endif
@@ -506,7 +507,7 @@ static void netserver_handle(void *param) {
                 netserver_accept_and_close(mgr);
             }
         }
-
+    session_handle:
         /* handle sessions */
         ns_session_handle(mgr, &tempreadfds, &tempexptfds);
     }
