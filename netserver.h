@@ -37,6 +37,7 @@ typedef struct _ns_session {
 typedef struct _netserver_cb {
     void (*session_create_cb)(ns_session_t *session);
     void (*session_close_cb)(ns_session_t *session);
+    int (*session_accept_cb)(ns_session_t *session);    /*when this function returns -1, the connection will be closed */
     int (*data_readable_cb)(ns_session_t *session, void *data, int sz);
 #if NS_ENABLE_SSL
     int (*ssl_handshake_cb)(ns_session_t *session, void *cert_data,

@@ -465,11 +465,21 @@ static void netserver_handle(void *param) {
                 new_conn->socket =
                     accept(mgr->listener->socket,
                            (struct sockaddr *)&new_conn->cliaddr, &clilen);
+
                 if (new_conn->socket < 0) {
                     NS_LOG("new connection accept failed");
                     ns_session_close(mgr, new_conn);
                 } else {
                     int ret = -1;
+                    /* notify user */
+                    if (mgr->opts.callback.session_accept_cb) {
+                        if (mgr->opts.callback.session_accept_cb(new_conn) <
+                            0) {
+                            /* when user return -1, we close connection */
+                            ns_session_close(mgr, new_conn);
+                            new_conn = NULL;
+                        }
+                    }
 #if NS_ENABLE_SSL
                     /* Do handshake */
                     if (mgr->flag & NS_USE_SSL) {
