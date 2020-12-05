@@ -37,7 +37,9 @@ typedef struct _ns_session {
 typedef struct _netserver_cb {
     void (*session_create_cb)(ns_session_t *session);
     void (*session_close_cb)(ns_session_t *session);
-    int (*session_accept_cb)(ns_session_t *session);    /*when this function returns -1, the connection will be closed */
+    int (*session_accept_cb)(
+        ns_session_t *session); /*when this function returns -1, the connection
+                                   will be closed */
     int (*data_readable_cb)(ns_session_t *session, void *data, int sz);
 #if NS_ENABLE_SSL
     int (*ssl_handshake_cb)(ns_session_t *session, void *cert_data,
@@ -84,7 +86,6 @@ typedef struct _netserver_mgr {
  * API definition
  */
 netserver_mgr_t *netserver_create(netserver_opt_t *opts, uint32_t flag);
-int netserver_bind_options(netserver_mgr_t *mgr, netserver_opt_t *opts);
 int netserver_start(netserver_mgr_t *mgr);
 int netserver_mgr_free(netserver_mgr_t *mgr);
 void netserver_set_session_timeout(netserver_mgr_t *mgr, uint32_t ms);
