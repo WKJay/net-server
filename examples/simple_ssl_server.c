@@ -1,11 +1,11 @@
 /*************************************************
  Copyright (c) 2020
  All rights reserved.
- File name:     simple_tcp_server.c
+ File name:     simple_ssl_server.c
  Description:
  History:
  1. Version:
-    Date:       2020-12-05
+    Date:       2020-12-06
     Author:     wangjunjie
     Modify:
 *************************************************/
@@ -18,32 +18,42 @@ static int netserver_readable_cb(ns_session_t *ns, void *data, int sz) {
     return ret;
 }
 
-int tcp_server_init(void) {
+int ssl_server_init(void) {
     netserver_opt_t opts;
     netserver_mgr_t *mgr = NULL;
     rt_memset(&opts, 0, sizeof(opts));
 
     opts.max_conns = 3;
-    opts.listen_port = 3333;
-    /* disconnect connection after one minute no data input */
-    opts.session_timeout = 1 * 60 * 1000;
+    opts.listen_port = 3334;
 
-    /* register callback function*/
+    /* disconnect connection after one minute no data input */
+    opts.session_timeout = 60 * 1000;
+
+    /* default stack size may not be enough */
+    opts.thread_attrs.stack_size = 6 * 1024;
+
+    /* load certificates */
+    opts.server_cert = "/sdcard/test/server_cert.pem";
+    opts.server_key = "/sdcard/test/private_key.pem";
+    /* maybe needed if you want to verify peer */
+    opts.ca_cert = "/sdcard/test/ca_cert.pem";
+
+    /* register callback function */
     opts.callback.data_readable_cb = netserver_readable_cb;
 
     /* create netserver manager object */
-    mgr = netserver_create(&opts, NULL);
+    mgr = netserver_create(&opts, NS_USE_SSL);
     if (mgr == NULL) {
-        printf("create simple tcp server manager failed.\r\n");
+        printf("create simple ssl server manager failed.\r\n");
         return -1;
     }
 
     /* start netserver */
     if (netserver_start(mgr) == 0) {
-        printf("start simple tcp server on port %d.\r\n", opts.listen_port);
+        printf("start simple ssl server on port %d.\r\n", opts.listen_port);
         return 0;
     } else {
-        printf("start simple tcp server error.\r\n");
+        printf("start simple ssl server error.\r\n");
         return -1;
     }
 }
