@@ -413,6 +413,7 @@ static void netserver_handle(void *param) {
 
     timeout.tv_sec = NS_SELECT_TIMEOUT / 1000;
     timeout.tv_usec = (NS_SELECT_TIMEOUT % 1000) * 1000;
+    
     /* waiting for new connection or data come in */
     for (;;) {
         FD_ZERO(&readset);
@@ -431,7 +432,7 @@ static void netserver_handle(void *param) {
         sockfd = select(maxfd, &tempreadfds, NULL, &tempexptfds, &timeout);
 
         if (NS_IS_RESET(mgr->flag)) {
-            NS_LOG("net server reseting...");
+            NS_LOG("restart netserver");
             goto exit;
         }
 
