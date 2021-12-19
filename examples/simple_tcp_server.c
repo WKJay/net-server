@@ -9,6 +9,7 @@
     Author:     WKJay
     Modify:
 *************************************************/
+#include <rtthread.h>
 #include <stdio.h>
 #include "netserver.h"
 
@@ -47,3 +48,4 @@ int tcp_server_init(void) {
         return -1;
     }
 }
+MSH_CMD_EXPORT(tcp_server_init,tcp server init);

@@ -9,6 +9,7 @@
     Author:     WKJay
     Modify:
 *************************************************/
+#include <rtthread.h>
 #include <stdio.h>
 #include "netserver.h"
 
@@ -57,3 +58,4 @@ int ssl_server_init(void) {
         return -1;
     }
 }
+MSH_CMD_EXPORT(ssl_server_init,ssl server init);
