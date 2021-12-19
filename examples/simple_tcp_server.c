@@ -6,7 +6,7 @@
  History:
  1. Version:
     Date:       2020-12-05
-    Author:     wangjunjie
+    Author:     WKJay
     Modify:
 *************************************************/
 #include <stdio.h>

@@ -6,12 +6,13 @@
  History:
  1. Version:
     Date:       2020-11-26
-    Author:     wangjunjie
+    Author:     WKJay
     Modify:
 *************************************************/
 #include <rtthread.h>
 
 #include "netserver.h"
+#include <sys/ioctl.h>
 #include <sys/time.h>
 
 #ifdef SAL_USING_POSIX
@@ -401,6 +402,7 @@ static void netserver_handle(void *param) {
         NS_LOG("create socket failed.");
         goto exit;
     }
+    NS_LOG("net server listening on port:%d.",mgr->opts.listen_port);
 
 #if NS_ENABLE_SSL
     /* Create ssl context*/
