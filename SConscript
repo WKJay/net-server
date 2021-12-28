@@ -3,7 +3,7 @@ from building import *
 cwd     = GetCurrentDir()
 CPPPATH = [
     cwd,
-    cwd+'ssl_if/wolfssl'
+    cwd+'/ssl_if/wolfssl'
 ]
 src     = Glob('*.c')
 

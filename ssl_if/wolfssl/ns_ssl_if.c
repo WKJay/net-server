@@ -9,7 +9,6 @@
     Author:     WKJay
     Modify:
 *************************************************/
-#include <wolfssl/options.h>
 #include <wolfssl/ssl.h>
 #include <wolfssl/internal.h>
 

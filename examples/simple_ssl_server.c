@@ -37,7 +37,7 @@ int ssl_server_init(void) {
     opts.server_cert = "/sdcard/test/server_cert.pem";
     opts.server_key = "/sdcard/test/private_key.pem";
     /* maybe needed if you want to verify peer */
-    opts.ca_cert = "/sdcard/test/ca_cert.pem";
+    //opts.ca_cert = "/sdcard/test/ca_cert.pem";
 
     /* register callback function */
     opts.callback.data_readable_cb = netserver_readable_cb;
