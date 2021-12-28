@@ -12,7 +12,11 @@
 #include <rtthread.h>
 
 #include "netserver.h"
+
+#if (RTTHREAD_VERSION >= 40004)
 #include <sys/ioctl.h>
+#endif
+
 #include <sys/time.h>
 
 #ifdef SAL_USING_POSIX
