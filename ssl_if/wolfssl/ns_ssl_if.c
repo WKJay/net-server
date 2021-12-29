@@ -9,6 +9,7 @@
     Author:     WKJay
     Modify:
 *************************************************/
+#include "user_settings.h"
 #include <wolfssl/ssl.h>
 #include <wolfssl/internal.h>
 
@@ -141,13 +142,17 @@ int ns_ssl_if_handshake(netserver_mgr_t *mgr, ns_session_t *session) {
     session->ssl_if_data = backend;
     /* notify user */
     if (mgr->opts.callback.ssl_handshake_cb) {
-        if (backend->ssl->peerCert.derCert) {
-            DerBuffer *peerCert = backend->ssl->peerCert.derCert;
-            mgr->opts.callback.ssl_handshake_cb(session, peerCert->buffer,
-                                                peerCert->length);
-        } else {
+        #if defined(KEEP_PEER_CERT)
+            if (backend->ssl->peerCert.derCert) {
+                DerBuffer *peerCert = backend->ssl->peerCert.derCert;
+                mgr->opts.callback.ssl_handshake_cb(session, peerCert->buffer,
+                                                    peerCert->length);
+            } else {
+                mgr->opts.callback.ssl_handshake_cb(session, NULL, 0);
+            }
+        #else
             mgr->opts.callback.ssl_handshake_cb(session, NULL, 0);
-        }
+        #endif
     }
     return 0;
 
