@@ -175,6 +175,12 @@ static void _session_handle(netserver_mgr_t *mgr, ns_session_t *conn) {
         // use default data handle logic
         if (ret > 0) {
             ret = netserver_write(conn, data_buff, ret);
+            /* close session if error occured */
+            if (ret < 0) {
+                NS_LOG("socket %d send err,close it", conn->socket);
+                ns_session_close(mgr, conn);
+                return;
+            }
         }
     }
 }
@@ -221,7 +227,9 @@ static int ns_all_connections_set_fds(netserver_mgr_t *mgr, fd_set *readset,
 static void ns_session_handle(netserver_mgr_t *mgr, fd_set *readset,
                               fd_set *excptset) {
     ns_session_t *cur_conn, *next_conn;
-
+    if(mgr->conns == NULL){
+        rt_thread_mdelay(1);
+    }
     for (cur_conn = mgr->conns; cur_conn; cur_conn = next_conn) {
         // obtain next session in case current session be closed
         next_conn = cur_conn->next;
@@ -451,7 +459,11 @@ static void netserver_handle(void *param) {
             // server.
             goto exit;
         }
-
+        /* if the listen fd is error*/
+        if(FD_ISSET(mgr->listener->socket,&tempexptfds)){
+            NS_LOG("listen socket is error, now restart netserver.");
+            goto exit;
+        }
         /* if the listen fd is ready*/
         if (FD_ISSET(mgr->listener->socket, &tempreadfds)) {
             socklen_t clilen;
