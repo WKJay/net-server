@@ -87,9 +87,11 @@ typedef struct _netserver_opt {
 
     |成员名|描述|
     |-|-|
+    |netserver_reset_cb|当 netserver 即将重启时被调用|
     |session_create_cb|当一条客户端连接被创建后被调用|
     |session_close_cb|当一条连接被关闭后被调用|
     |session_accept_cb|当一条连接被接入后被调用|
+    |session_poll_cb|当触发轮询事件后被调用（数据可读/连接异常/select 超时）|
     |data_readable_cb|当一条连接上有数据到达后被调用|
     |ssl_handshake_cb|**[SSL/TLS]** 当一条连接进行SSL握手后被调用|
 

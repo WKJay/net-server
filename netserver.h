@@ -14,6 +14,8 @@
 #define NS_SSL_VERIFY_PEER     (1 << 5)
 #define NS_SSL_FORCE_PEER_CERT (1 << 6)  // if no peer cert , handshake fails
 
+typedef struct _netserver_mgr netserver_mgr_t;
+
 /**
  * netserver session struct
  * */
@@ -35,13 +37,15 @@ typedef struct _ns_session {
  * netserver callback
  * */
 typedef struct _netserver_cb {
+    void (*netserver_reset_cb)(netserver_mgr_t *mgr);
+
     void (*session_create_cb)(ns_session_t *session);
     void (*session_close_cb)(ns_session_t *session);
     int (*session_accept_cb)(ns_session_t *session);
+    int (*session_poll_cb)(ns_session_t *session);
     int (*data_readable_cb)(ns_session_t *session, void *data, int sz);
 #if NS_ENABLE_SSL
-    int (*ssl_handshake_cb)(ns_session_t *session, void *cert_data,
-                            int cert_size);
+    int (*ssl_handshake_cb)(ns_session_t *session, void *cert_data, int cert_size);
 #endif
 } netserver_cb_t;
 

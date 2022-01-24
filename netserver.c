@@ -233,6 +233,9 @@ static void ns_session_handle(netserver_mgr_t *mgr, fd_set *readset,
     for (cur_conn = mgr->conns; cur_conn; cur_conn = next_conn) {
         // obtain next session in case current session be closed
         next_conn = cur_conn->next;
+        if (mgr->opts.callback.session_poll_cb) {
+            mgr->opts.callback.session_poll_cb(cur_conn);
+        }
         if (FD_ISSET(cur_conn->socket, excptset)) {
             NS_LOG("socket %d error,now close", cur_conn->socket);
             ns_session_close(mgr, cur_conn);
@@ -452,6 +455,9 @@ static void netserver_handle(void *param) {
 
         check_session_timeout(mgr);
         if (sockfd == 0) {
+            if (mgr->opts.callback.session_poll_cb) {
+                mgr->opts.callback.session_poll_cb(NULL);
+            }
             // NS_LOG("net server select timeout");
             continue;
         } else if (sockfd == -1) {
@@ -528,6 +534,9 @@ static void netserver_handle(void *param) {
 
 exit:
     netserver_close_all(mgr);
+    if (mgr->opts.callback.netserver_reset_cb) {
+        mgr->opts.callback.netserver_reset_cb(mgr);
+    }
 }
 
 static void netserver(void *param) {
