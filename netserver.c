@@ -32,6 +32,7 @@
 /* Flags set by net server*/
 #define NS_SESSION_F_LISTENING (1 << 0)
 #define NS_SESSION_F_SSL       (1 << 1)
+#define NS_SESSION_F_CLOSE     (1 << 2)
 
 #define NS_IF_LISTEN_BACKLOG 6
 #define NS_SELECT_TIMEOUT    2000
@@ -43,6 +44,7 @@
 #define NS_IS_RESET(s) (s & NS_RESET_FLAG)
 
 #define IS_LISTEN_SESSION(s) (s->flag & NS_SESSION_F_LISTENING)
+#define IS_CLOSED_SESSION(s) (s->flag & NS_SESSION_F_CLOSE)
 
 /*------------------------------------------------------------------------------------//
                                     SESSION
@@ -112,6 +114,11 @@ static ns_session_t *ns_session_create(netserver_mgr_t *mgr, uint32_t flag) {
 static int ns_session_close(netserver_mgr_t *mgr, ns_session_t *session) {
     ns_session_t *iter;
 
+    /* notify user */
+    if (mgr->opts.callback.session_close_cb) {
+        mgr->opts.callback.session_close_cb(session);
+    }
+
     /* Close socket */
     if (session->socket >= 0) {
         closesocket(session->socket);
@@ -139,10 +146,6 @@ static int ns_session_close(netserver_mgr_t *mgr, ns_session_t *session) {
                     break;
                 }
             }
-        }
-        /* notify user */
-        if (mgr->opts.callback.session_close_cb) {
-            mgr->opts.callback.session_close_cb(session);
         }
         NS_FREE(session);
     }
@@ -291,6 +294,16 @@ static void netserver_close_all(netserver_mgr_t *mgr) {
     }
 }
 
+static void check_session_close(netserver_mgr_t *mgr) {
+    ns_session_t *conn = NULL;
+    for (conn = mgr->conns; conn; conn = conn->next) {
+        if (conn->flag & NS_SESSION_F_CLOSE) {
+            NS_LOG("connecion %d received close command,close it.", conn->socket);
+            ns_session_close(mgr, conn);
+        }
+    }
+}
+
 static void check_session_timeout(netserver_mgr_t *mgr) {
     ns_session_t *conn = NULL;
     if (mgr->opts.session_timeout == 0) {
@@ -316,6 +329,7 @@ static void netserver_accept_and_close(netserver_mgr_t *mgr) {
 }
 
 int netserver_read(ns_session_t *ns, void *data, int sz) {
+    if (IS_CLOSED_SESSION(ns)) return 0;
 #if NS_ENABLE_SSL
     if (ns->flag & NS_SESSION_F_SSL) {
         return ns_ssl_if_read(ns, data, sz);
@@ -327,6 +341,7 @@ int netserver_read(ns_session_t *ns, void *data, int sz) {
 }
 
 int netserver_write(ns_session_t *ns, void *data, int sz) {
+    if (IS_CLOSED_SESSION(ns)) return 0;
 #if NS_ENABLE_SSL
     if (ns->flag & NS_SESSION_F_SSL) {
         return ns_ssl_if_write(ns, data, sz);
@@ -362,6 +377,8 @@ void netserver_set_session_timeout(netserver_mgr_t *mgr, uint32_t ms) {
  * Output:  None
  */
 void netserver_restart(netserver_mgr_t *mgr) { mgr->flag |= NS_RESET_FLAG; }
+
+void netserver_session_close(ns_session_t *ns) { ns->flag |= NS_SESSION_F_CLOSE; }
 
 static int listen_socket_create(netserver_mgr_t *mgr) {
     int reuse = 1;
@@ -430,7 +447,7 @@ static void netserver_handle(void *param) {
 
     timeout.tv_sec = NS_SELECT_TIMEOUT / 1000;
     timeout.tv_usec = (NS_SELECT_TIMEOUT % 1000) * 1000;
-    
+
     /* waiting for new connection or data come in */
     for (;;) {
         FD_ZERO(&readset);
@@ -453,7 +470,9 @@ static void netserver_handle(void *param) {
             goto exit;
         }
 
+        check_session_close(mgr);
         check_session_timeout(mgr);
+
         if (sockfd == 0) {
             if (mgr->opts.callback.session_poll_cb) {
                 mgr->opts.callback.session_poll_cb(NULL);

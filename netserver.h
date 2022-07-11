@@ -94,6 +94,7 @@ netserver_mgr_t *netserver_create(netserver_opt_t *opts, uint32_t flag);
 int netserver_start(netserver_mgr_t *mgr);
 int netserver_mgr_free(netserver_mgr_t *mgr);
 void netserver_set_session_timeout(netserver_mgr_t *mgr, uint32_t ms);
+void netserver_session_close(ns_session_t *ns);
 int netserver_read(ns_session_t *ns, void *data, int sz);
 int netserver_write(ns_session_t *ns, void *data, int sz);
 void netserver_restart(netserver_mgr_t *mgr);
