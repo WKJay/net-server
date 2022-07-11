@@ -33,7 +33,7 @@ int tcp_server_init(void) {
     opts.callback.data_readable_cb = netserver_readable_cb;
 
     /* create netserver manager object */
-    mgr = netserver_create(&opts, NULL);
+    mgr = netserver_create(&opts, 0);
     if (mgr == NULL) {
         printf("create simple tcp server manager failed.\r\n");
         return -1;

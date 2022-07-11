@@ -69,6 +69,9 @@ typedef struct _netserver_opt {
     const char *server_key;
     const char *server_cert;
     const char *ca_cert;
+    const char *server_key_buffer;
+    const char *server_cert_buffer;
+    const char *ca_cert_buffer;
 #endif
 
 } netserver_opt_t;

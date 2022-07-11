@@ -165,7 +165,7 @@ static void _session_handle(netserver_mgr_t *mgr, ns_session_t *conn) {
     }
     /* warn user if data buffer is full */
     if (ret == buff_sz) {
-        NS_LOG("net server data buffer is full. current buffer size is %d",
+        NS_LOG("net server data buffer is full. current buffer size is %lu",
                buff_sz);
     }
     /* handle data package */
@@ -476,7 +476,7 @@ static void netserver_handle(void *param) {
             NS_LOG("new connection comes in");
             clilen = sizeof(struct sockaddr_in);
 
-            ns_session_t *new_conn = ns_session_create(mgr, NULL);
+            ns_session_t *new_conn = ns_session_create(mgr, 0);
             if (new_conn) {
                 /* notify user */
                 if (mgr->opts.callback.session_create_cb)

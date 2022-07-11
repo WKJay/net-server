@@ -75,33 +75,67 @@ int ns_ssl_if_context_create(netserver_mgr_t *mgr) {
     }
 
     /* Load private key and certificate */
-    if (opts->server_cert == NULL || opts->server_key == NULL) {
-        NS_LOG("private key or certificate path error,please check!");
-        return NULL;
+    if (opts->server_cert_buffer == NULL || opts->server_key_buffer == NULL) {
+#ifdef NO_FILESYSTEM
+        NS_LOG("no private key or certificate provided,please check!");
+        return -1;
+#else
+        goto load_cert_file;
+#endif
     }
-    if (wolfSSL_CTX_use_PrivateKey_file(backend->ctx, opts->server_key,
-                                        SSL_FILETYPE_PEM) != SSL_SUCCESS) {
-        NS_LOG("load private key %s failed.", opts->server_key);
+
+    if (wolfSSL_CTX_use_PrivateKey_buffer(
+            backend->ctx, (const unsigned char *)opts->server_key_buffer,
+            strlen(opts->server_key_buffer), WOLFSSL_FILETYPE_PEM) != SSL_SUCCESS) {
+        NS_LOG("load private key buffer failed.");
         goto exit;
     }
-    if (wolfSSL_CTX_use_certificate_file(backend->ctx, opts->server_cert,
-                                         SSL_FILETYPE_PEM) != SSL_SUCCESS) {
-        NS_LOG("load certificate %s failed.", opts->server_cert);
+
+    if (wolfSSL_CTX_use_certificate_buffer(
+            backend->ctx, (const unsigned char *)opts->server_cert_buffer,
+            strlen(opts->server_cert_buffer), WOLFSSL_FILETYPE_PEM) != SSL_SUCCESS) {
+        NS_LOG("load certificate buffer failed.");
         goto exit;
     }
-    if (opts->ca_cert) {
-        if (wolfSSL_CTX_load_verify_locations_ex(
-                backend->ctx, opts->ca_cert, NULL,
-                WOLFSSL_LOAD_FLAG_DATE_ERR_OKAY) != SSL_SUCCESS) {
-            NS_LOG("load ca %s failed.", opts->ca_cert);
+
+    if (opts->ca_cert_buffer) {
+        if (wolfSSL_CTX_load_verify_buffer_ex(backend->ctx,
+                                              (const unsigned char *)opts->ca_cert_buffer,
+                                              strlen(opts->ca_cert_buffer), WOLFSSL_FILETYPE_PEM, 0,
+                                              WOLFSSL_LOAD_FLAG_DATE_ERR_OKAY) != SSL_SUCCESS) {
+            NS_LOG("load ca certificate buffer failed.");
             goto exit;
         }
     }
 
+#ifndef NO_FILESYSTEM
+load_cert_file:
+    if (opts->server_cert == NULL || opts->server_key == NULL) {
+        NS_LOG("private key or certificate path error,please check!");
+        return -1;
+    }
+    if (wolfSSL_CTX_use_PrivateKey_file(backend->ctx, opts->server_key, SSL_FILETYPE_PEM) !=
+        SSL_SUCCESS) {
+        NS_LOG("load private key %s failed.", opts->server_key);
+        goto exit;
+    }
+    if (wolfSSL_CTX_use_certificate_file(backend->ctx, opts->server_cert, SSL_FILETYPE_PEM) !=
+        SSL_SUCCESS) {
+        NS_LOG("load certificate %s failed.", opts->server_cert);
+        goto exit;
+    }
+    if (opts->ca_cert) {
+        if (wolfSSL_CTX_load_verify_locations_ex(backend->ctx, opts->ca_cert, NULL,
+                                                 WOLFSSL_LOAD_FLAG_DATE_ERR_OKAY) != SSL_SUCCESS) {
+            NS_LOG("load ca %s failed.", opts->ca_cert);
+            goto exit;
+        }
+    }
+#endif
+
     /* set verify mode */
     if (mgr->flag & NS_SSL_VERIFY_PEER) mode |= SSL_VERIFY_PEER;
-    if (mgr->flag & NS_SSL_FORCE_PEER_CERT)
-        mode |= SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+    if (mgr->flag & NS_SSL_FORCE_PEER_CERT) mode |= SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
     if (mode) wolfSSL_CTX_set_verify(backend->ctx, mode, NULL);
 
     mgr->listener->ssl_if_data = backend;
@@ -114,8 +148,7 @@ exit:
 
 int ns_ssl_if_handshake(netserver_mgr_t *mgr, ns_session_t *session) {
     wolfssl_backend_t *backend = NULL;
-    wolfssl_backend_t *ls_back =
-        (wolfssl_backend_t *)mgr->listener->ssl_if_data;
+    wolfssl_backend_t *ls_back = (wolfssl_backend_t *)mgr->listener->ssl_if_data;
 
     /* Create wolfssl backend struct */
     backend = NS_CALLOC(1, sizeof(wolfssl_backend_t));
@@ -142,17 +175,16 @@ int ns_ssl_if_handshake(netserver_mgr_t *mgr, ns_session_t *session) {
     session->ssl_if_data = backend;
     /* notify user */
     if (mgr->opts.callback.ssl_handshake_cb) {
-        #if defined(KEEP_PEER_CERT)
-            if (backend->ssl->peerCert.derCert) {
-                DerBuffer *peerCert = backend->ssl->peerCert.derCert;
-                mgr->opts.callback.ssl_handshake_cb(session, peerCert->buffer,
-                                                    peerCert->length);
-            } else {
-                mgr->opts.callback.ssl_handshake_cb(session, NULL, 0);
-            }
-        #else
+#if defined(KEEP_PEER_CERT)
+        if (backend->ssl->peerCert.derCert) {
+            DerBuffer *peerCert = backend->ssl->peerCert.derCert;
+            mgr->opts.callback.ssl_handshake_cb(session, peerCert->buffer, peerCert->length);
+        } else {
             mgr->opts.callback.ssl_handshake_cb(session, NULL, 0);
-        #endif
+        }
+#else
+        mgr->opts.callback.ssl_handshake_cb(session, NULL, 0);
+#endif
     }
     return 0;
 
